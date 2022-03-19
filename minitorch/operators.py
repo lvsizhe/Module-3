@@ -69,10 +69,10 @@ def sigmoid(x):
         float : sigmoid value
     """
     if x >= 0:
-        t = 1.0 + exp(-x)
+        t = 1.0 + math.exp(-x)
         return 1.0 / t
     else:
-        t = exp(x)
+        t = math.exp(x)
         return t / (1.0 + t)
 
 
@@ -106,7 +106,7 @@ def exp(x):
 
 def log_back(x, d):
     r"If :math:`f = log` as above, compute d :math:`d \times f'(x)`"
-    return d * inv(x)
+    return d * 1.0 / x
 
 
 def inv(x):
@@ -116,7 +116,7 @@ def inv(x):
 
 def inv_back(x, d):
     r"If :math:`f(x) = 1/x` compute d :math:`d \times f'(x)`"
-    return neg(d * inv(x) / x)
+    return -1.0 * d / (x ** 2)
 
 
 def relu_back(x, d):

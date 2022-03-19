@@ -25,9 +25,6 @@ def index_to_position(index, strides):
     Returns:
         int : position in storage
     """
-
-    assert(len(index) == len(strides))
-
     pos = 0
     for i, idx in enumerate(index):
         pos += idx * strides[i]
@@ -52,9 +49,9 @@ def to_index(ordinal, shape, out_index):
 
     """
 
-    t = ordinal
+    remain = int(ordinal)
     for i in range(len(shape)-1, -1, -1):
-        t, out_index[i] = divmod(t, shape[i])
+        remain, out_index[i] = divmod(remain, shape[i])
 
     return
 
