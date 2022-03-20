@@ -301,19 +301,20 @@ def tensor_matrix_multiply(
     b_batch_stride = b_strides[0] if b_shape[0] > 1 else 0
 
     size = len(out)
-    out_index = [0] * len(out_shape)
-    a_index = [0] * len(a_shape)
-    b_index = [0] * len(b_shape)
     for i in prange(size):
+        out_index = out_shape.copy()
+
         to_index(i, out_shape, out_index)
 
-        at_index = out_index.copy()
-        bt_index = out_index.copy()
         out_pos = index_to_position(out_index, out_strides)
         for j in prange(a_shape[-1]):
+            at_index = out_index.copy()
+            bt_index = out_index.copy()
             at_index[-1] = j
-            btß_index[-2] = j
+            bt_index[-2] = j
 
+            a_index = a_shape.copy()
+            b_index = b_shape.copy()
             broadcast_index(at_index, out_shape, a_shape, a_index)
             broadcast_index(bt_index, out_shape, b_shape, b_index)
 
