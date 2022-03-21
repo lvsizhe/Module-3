@@ -26,8 +26,8 @@ def index_to_position(index, strides):
         int : position in storage
     """
     pos = 0
-    for i, idx in enumerate(index):
-        pos += idx * strides[i]
+    for i in range(len(strides)):
+        pos += index[i] * strides[i]
 
     return pos
 
@@ -49,11 +49,10 @@ def to_index(ordinal, shape, out_index):
 
     """
 
-    remain = int(ordinal)
+    remain = ordinal + 0
     for i in range(len(shape)-1, -1, -1):
-        remain, out_index[i] = divmod(remain, shape[i])
-
-    return
+        out_index[i] = remain % shape[i]
+        remain //= shape[i]
 
 
 def broadcast_index(big_index, big_shape, shape, out_index):
@@ -239,7 +238,7 @@ class TensorData:
                     break
             s += l
             v = self.get(index)
-            s += f"{v:3.2f}"
+            s += f"{v:3.10f}"
             l = ""
             for i in range(len(index) - 1, -1, -1):
                 if index[i] == self.shape[i] - 1:

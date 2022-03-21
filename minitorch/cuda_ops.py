@@ -172,7 +172,7 @@ def _sum_practice(out, a, size):
         size (int):  length of a.
 
     """
-    shmem = cuda.shared.array(THREADS_PER_BLOCK, numba.float32)
+    shmem = cuda.shared.array(THREADS_PER_BLOCK, numba.float64)
 
     idx = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
     if idx >= size:
@@ -183,7 +183,7 @@ def _sum_practice(out, a, size):
     cuda.syncthreads()
 
     if cuda.threadIdx.x == 0:
-        t = cuda.local.array(1, numba.float32)
+        t = cuda.local.array(1, numba.float64)
         for i in range(THREADS_PER_BLOCK):
             t[0] += shmem[i]
         out[cuda.blockIdx.x] = t[0]
@@ -234,24 +234,32 @@ def tensor_reduce(fn):
         reduce_dim,
         reduce_value,
     ):
-        idx = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
-        if idx >= out_size:
-            return
+        shmem = cuda.shared.array(1024, numba.float64)
+        index = cuda.local.array(MAX_DIMS, numba.int32)
 
-        out_index = cuda.local.array(MAX_DIMS, numba.int32)
+        to_index(cuda.blockIdx.x, out_shape, index)
+        
+        group_idx = index[reduce_dim]
+        idx = group_idx * cuda.blockDim.x + cuda.threadIdx.x
+        if idx < a_shape[reduce_dim]:
+            index[reduce_dim] = idx
+            a_pos = index_to_position(index, a_strides)
+            shmem[cuda.threadIdx.x] = a_storage[a_pos]
+        
+        cuda.syncthreads()
 
-        to_index(idx, out_shape, out_index)
-
-        a_index = cuda.local.array(MAX_DIMS, numba.int32)
-        out_pos = index_to_position(out_index, out_strides)
-        out[out_pos] = reduce_value
-        for j in range(a_shape[reduce_dim]):
-            a_index = out_index
-            a_index[reduce_dim] = j
-
-            a_pos = index_to_position(a_index, a_strides)
-            out[out_pos] = fn(out[out_pos], a_storage[a_pos])
-
+        if cuda.threadIdx.x == 0:
+            t = reduce_value
+            for i in range(1024):
+                idx = group_idx * cuda.blockDim.x + i
+                if idx >= a_shape[reduce_dim]:
+                    break
+                
+                t = fn(t, shmem[i])
+            
+            index[reduce_dim] = group_idx
+            out_pos = index_to_position(index, out_strides)
+            out[out_pos] = t
 
     return cuda.jit()(_reduce)
 
