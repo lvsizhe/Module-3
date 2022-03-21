@@ -211,15 +211,15 @@ def tensor_reduce(fn):
             to_index(i, out_shape, out_index)
 
             a_index = out_index.copy()
-
+            out_pos = index_to_position(out_index, out_strides)
             for j in range(a_shape[reduce_dim]):
                 a_index[reduce_dim] = j
 
                 a_pos = index_to_position(a_index, a_strides)
                 if j == 0:
-                    out[i] = a_storage[a_pos]
+                    out[out_pos] = a_storage[a_pos]
                 else:
-                    out[i] = fn(out[i], a_storage[a_pos])
+                    out[out_pos] = fn(out[out_pos], a_storage[a_pos])
 
     return njit(parallel=True)(_reduce)
 
@@ -305,8 +305,8 @@ def tensor_matrix_multiply(
         out_index = out_shape.copy()
 
         to_index(i, out_shape, out_index)
-
         out_pos = index_to_position(out_index, out_strides)
+        
         for j in prange(a_shape[-1]):
             at_index = out_index.copy()
             bt_index = out_index.copy()
