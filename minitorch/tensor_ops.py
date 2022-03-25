@@ -241,7 +241,10 @@ def tensor_reduce(fn):
 
             a_pos = index_to_position(a_index, a_strides)
             out_pos = index_to_position(out_index, out_strides)
-            out[out_pos] = fn(out[out_pos], a_storage[a_pos])
+            if i == 0:
+                out[out_pos] = a_storage[a_pos]
+            else:
+                out[out_pos] = fn(out[out_pos], a_storage[a_pos])
 
     return _reduce
 

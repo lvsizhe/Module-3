@@ -245,21 +245,36 @@ def tensor_reduce(fn):
             index[reduce_dim] = idx
             a_pos = index_to_position(index, a_strides)
             shmem[cuda.threadIdx.x] = a_storage[a_pos]
-        
-        cuda.syncthreads()
 
-        if cuda.threadIdx.x == 0:
-            t = reduce_value
-            for i in range(1024):
-                idx = group_idx * cuda.blockDim.x + i
-                if idx >= a_shape[reduce_dim]:
-                    break
-                
-                t = fn(t, shmem[i])
+        if cuda.threadIdx.x > 0:
+            return
+
+        """
+        n = a_shape[reduce_dim]
+        for i in range(10):
+            numba.cuda.threadfence_block()
+
+            k = (n + 1) // 2
+            if cuda.threadIdx.x < k:
+                t = cuda.threadIdx.x + k
+                if t < n:
+                    shmem[cuda.threadIdx.x] = fn(shmem[cuda.threadIdx.x], shmem[t])
+            else:
+                return
+
+            if k == 1:
+                break
             
-            index[reduce_dim] = group_idx
-            out_pos = index_to_position(index, out_strides)
-            out[out_pos] = t
+            n = k
+        """
+
+        t = reduce_value
+        for i in range(a_shape[reduce_dim]):
+            t = fn(t, shmem[i])
+
+        index[reduce_dim] = group_idx
+        pos = index_to_position(index, out_strides)
+        out[pos] = t
 
     return cuda.jit()(_reduce)
 
@@ -418,7 +433,6 @@ def tensor_matrix_multiply(
 
     shm_c = cuda.shared.array((THREADS_PER_BLOCK, THREADS_PER_BLOCK), numba.float64)
     shm_c[cuda.threadIdx.x][cuda.threadIdx.y] = 0.0
-    cuda.syncthreads()
 
     shm_a = cuda.shared.array((THREADS_PER_BLOCK, THREADS_PER_BLOCK), numba.float64)
     shm_b = cuda.shared.array((THREADS_PER_BLOCK, THREADS_PER_BLOCK), numba.float64)
@@ -448,10 +462,8 @@ def tensor_matrix_multiply(
 
         for j in range(THREADS_PER_BLOCK):
             shm_c[cuda.threadIdx.x][cuda.threadIdx.y] += shm_a[cuda.threadIdx.x][j] * shm_b[j][cuda.threadIdx.y]
-        
-        cuda.syncthreads()
 
-    cuda.syncthreads()
+        cuda.syncthreads()
 
     if idx_z < out_shape[0] and idx_x < out_shape[1] and idx_y < out_shape[2]:
         pos = index_to_position((idx_z, idx_x, idx_y), out_strides)
@@ -499,9 +511,6 @@ def matrix_multiply(a, b):
         out.shape[0],
     )
     threadsperblock = (THREADS_PER_BLOCK, THREADS_PER_BLOCK, 1)
-
-    count = (a.shape[-1] + THREADS_PER_BLOCK - 1) // THREADS_PER_BLOCK
-    print("a.shape={}, b.shape={}, COUNT={}".format(a.shape, b.shape, count))
 
     tensor_matrix_multiply[blockspergrid, threadsperblock](
         *out.tuple(), out.size, *a.tuple(), *b.tuple()
